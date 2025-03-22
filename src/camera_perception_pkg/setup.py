@@ -20,6 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'image_publisher = camera_perception_pkg.image_publisher:main',
+            'yolov8 = camera_perception_pkg.yolov8:main',
         ],
     },
 )

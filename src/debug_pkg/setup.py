@@ -20,6 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'yolo_debugger = debug_pkg.yolo_debugger:main',
+            'communication_debugger = debug_pkg.communication_debugger:main',
         ],
     },
 )
