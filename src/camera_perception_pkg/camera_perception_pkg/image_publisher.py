@@ -7,6 +7,7 @@ import cv2
 import cv_bridge
 
 import time
+import logging
 
 
 ## <Parameter> #####################################################################################
@@ -24,7 +25,10 @@ NODE_NAME = "image_publisher"
 TOPIC_NAME = "image_publisher"
 
 # 전송 주기
-PUBLISH_PERIOD = 0.05
+PUBLISH_PERIOD = 0.03
+
+# 로깅 여부
+LOG = False
 
 ######################################################################################################
 
@@ -48,14 +52,12 @@ PUBLISH_PERIOD = 0.05
 
 
 class image_publisher(Node):
-    def __init__(self, frame_src, node_name, topic_name, publish_period, frame_size : list):
+    def __init__(self, frame_src, node_name, topic_name, publish_period, frame_size : list, log):
         super().__init__(node_name)
 
         self.cap = cv2.VideoCapture(frame_src) # 영상 프레임 출력을 위한 Object 변수를 선언
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_size[0]) # 영상 가로 길이 지정
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_size[1]) # 영상 세로 길이 지정
-
-        self.node_name = node_name # 노드 이름 저장
 
         self.qos = QoSProfile( # QOS 설정
                 reliability=QoSReliabilityPolicy.RELIABLE,
@@ -68,16 +70,21 @@ class image_publisher(Node):
         self.timer = self.create_timer(publish_period, self.publish_callback) # Topic 발행을 위한 Timer 선언
         self.bridge = cv_bridge.CvBridge() # CV Bridge Object 선언
 
-    def publish_callback(self):
-        self.ret, self.frame = self.cap.read() # 영상 프레임 읽기
+        if log == False: # 로깅 여부 설정
+            self.get_logger().set_level(logging.FATAL)
 
-        if self.ret == True: # 정상
-            self.publisher.publish(self.bridge.cv2_to_imgmsg(self.frame))
+
+    def publish_callback(self):
+        ret, frame = self.cap.read() # 영상 프레임 읽기
+
+        if ret == True: # 정상
+            self.publisher.publish(self.bridge.cv2_to_imgmsg(frame))
             self.get_logger().info("frame published")
 
         else: # 오류
             self.get_logger().warn("unable to read frame") # 오류 출력
             time.sleep(0.5) # 시간 지연, 오류 정정 시간 확보
+
 
     def shutdown(self):
         self.cap.release() # Object 변수 해제
@@ -86,7 +93,7 @@ class image_publisher(Node):
 
 def main():
     rclpy.init()
-    image_publisher_node = image_publisher(FRAME_SRC, NODE_NAME, TOPIC_NAME, PUBLISH_PERIOD, FRAME_SIZE)
+    image_publisher_node = image_publisher(FRAME_SRC, NODE_NAME, TOPIC_NAME, PUBLISH_PERIOD, FRAME_SIZE, LOG)
     rclpy.spin(image_publisher_node)
 
     image_publisher_node.shutdown()

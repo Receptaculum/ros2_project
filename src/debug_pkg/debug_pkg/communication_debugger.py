@@ -6,14 +6,6 @@ from rclpy.node import Node
 from std_msgs.msg import UInt8MultiArray
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
-from message_filters import Subscriber, ApproximateTimeSynchronizer
-
-import cv2
-import cv_bridge
-
-import torch
-import numpy as np
-
 import random
 
 ## <Parameter> #####################################################################################

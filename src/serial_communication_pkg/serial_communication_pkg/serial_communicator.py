@@ -4,6 +4,7 @@ from std_msgs.msg import UInt8MultiArray
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
 import serial
+import logging
 
 
 ## <Parameter> #####################################################################################
@@ -19,6 +20,9 @@ NODE_NAME = "serial_communicator"
 
 # 구독 토픽 이름
 SUB_TOPIC_NAME = "command_data"
+
+# 로깅 여부
+LOG = False
 
 ######################################################################################################
 
@@ -42,7 +46,7 @@ SUB_TOPIC_NAME = "command_data"
 
 
 class serial_communicator(Node):
-    def __init__(self, node_name, port_name, baud_rate, sub_topic_name):
+    def __init__(self, node_name, port_name, baud_rate, sub_topic_name, log):
         super().__init__(node_name)
 
         # Serial 통신을 위한 Class 선언
@@ -55,8 +59,13 @@ class serial_communicator(Node):
                 depth=1
                 )
 
-        # 제어 값 구독
+        # 지령값 구독
         self.subscriber = self.create_subscription(UInt8MultiArray, sub_topic_name, self.send_callback, self.qos)
+
+        # 로깅 여부 설정
+        if log == False: 
+            self.get_logger().set_level(logging.FATAL)
+
 
     def send_callback(self, msg):
         steer_angle = msg.data[0]
@@ -78,7 +87,7 @@ class serial_communicator(Node):
 
 def main():
     rclpy.init()
-    serial_node = serial_communicator(NODE_NAME, PORT_NAME, BAUD_RATE, SUB_TOPIC_NAME)
+    serial_node = serial_communicator(NODE_NAME, PORT_NAME, BAUD_RATE, SUB_TOPIC_NAME, LOG)
     rclpy.spin(serial_node)
 
     serial_node.destroy_node()

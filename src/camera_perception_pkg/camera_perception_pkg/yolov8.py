@@ -4,14 +4,14 @@ from sensor_msgs.msg import Image
 from interfaces_pkg.msg import SegmentGroup
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
+import torch
 from ultralytics import YOLO
 
 import cv2
 import cv_bridge
 
-import torch
-
 import os
+import logging
 
 
 ## <Parameter> #####################################################################################
@@ -32,7 +32,10 @@ SUB_TOPIC_NAME = "image_publisher"
 PT_NAME = "lib/pt/best.pt"
 
 # CV 처리 영상 출력 여부
-DEBUG = True
+DEBUG = False
+
+# 로깅 여부
+LOG = False
 
 # 동작 모드 (cpu, cuda, xpu)
 DEVICE = "cpu"
@@ -62,7 +65,7 @@ THREAD = 8
 
 
 class yolov8(Node):
-    def __init__(self, node_name, topic_name : list, sub_topic_name, pt_name, debug, label_name, device, thread):
+    def __init__(self, node_name, topic_name : list, sub_topic_name, pt_name, debug, label_name, device, thread, log):
         super().__init__(node_name)
 
         self.model = YOLO(os.path.dirname(__file__) + "/" + pt_name) # YOLO Model 선언
@@ -77,7 +80,6 @@ class yolov8(Node):
             torch.set_num_threads(thread)
             self.model.to(device)
 
-
         self.qos_pub = QoSProfile( # Publisher QOS 설정
                 reliability=QoSReliabilityPolicy.RELIABLE,
                 durability=QoSDurabilityPolicy.VOLATILE,
@@ -91,9 +93,6 @@ class yolov8(Node):
                 history=QoSHistoryPolicy.KEEP_LAST,
                 depth=1
                 )
-        
-        # Topic 이름 선언
-        self.topic = topic_name
 
         # 라벨 이름 변수 선언
         self.label_0 = label_name[0]
@@ -105,7 +104,7 @@ class yolov8(Node):
         self.debug = debug
 
         # Publisher 선언
-        self.publisher = self.create_publisher(SegmentGroup, self.topic, self.qos_pub) 
+        self.publisher = self.create_publisher(SegmentGroup, topic_name, self.qos_pub) 
 
         # Subscriber 선언
         self.subscriber = self.create_subscription(Image, sub_topic_name, self.recognizer_callback, self.qos_sub)
@@ -113,15 +112,20 @@ class yolov8(Node):
         # CV Bridge Object 선언
         self.bridge = cv_bridge.CvBridge()
 
+        # 로깅 여부 설정
+        if log == False: 
+            self.get_logger().set_level(logging.FATAL)
+
+
     def recognizer_callback(self, img_msg):
         # Publishing을 위한 Message 선언
-        self.msg = SegmentGroup()
+        msg = SegmentGroup()
 
-        self.frame = self.bridge.imgmsg_to_cv2(img_msg) # Frame 수령 및 처리
-        self.predicted = self.model.predict(self.frame, verbose=False) # Frame Segmentation 처리
+        frame = self.bridge.imgmsg_to_cv2(img_msg) # Frame 수령 및 처리
+        predicted = self.model.predict(frame, verbose=False) # Frame Segmentation 처리
 
         if self.debug == True: # 디버깅(화면 출력) 여부 결정
-            cv2.imshow("YOLO", self.predicted[0].plot())
+            cv2.imshow("YOLO", predicted[0].plot())
             cv2.waitKey(5)
 
         # 카운트를 위한 변수 선언
@@ -135,29 +139,29 @@ class yolov8(Node):
         # predict_mask = self.predicted[0].masks[torch.argsort(self.predicted[0].boxes.conf, descending=True)]
 
         # Box, Mask 변수 선언
-        predict_box = self.predicted[0].boxes
-        predict_mask = self.predicted[0].masks
+        predict_box = predicted[0].boxes
+        predict_mask = predicted[0].masks
 
         self.get_logger().info(f"{len(predict_box.conf.tolist())} object(s) detected | value = {predict_box.conf.tolist()}")
 
         # Box : 상자 / Keypoint : 관절 표현 / Mask : 영역 표시
         for n, predict_val in enumerate(predict_box):
-            name = self.predicted[0].names[int(predict_val.cls.item())].strip()
+            name = predicted[0].names[int(predict_val.cls.item())].strip()
 
             if  name == self.label_0.strip() and cnt_0 == 0:
-                self.msg.lane_1 = torch.Tensor(predict_mask[n].xy[0]).to(torch.int16).flatten().tolist()
+                msg.lane_1 = torch.Tensor(predict_mask[n].xy[0]).to(torch.int16).flatten().tolist()
                 cnt_0 += 1
             
             elif name == self.label_1.strip() and cnt_1 == 0:
-                self.msg.lane_2 = torch.Tensor(predict_mask[n].xy[0]).to(torch.int16).flatten().tolist()    
+                msg.lane_2 = torch.Tensor(predict_mask[n].xy[0]).to(torch.int16).flatten().tolist()    
                 cnt_1 += 1
 
             elif name == self.label_2.strip() and cnt_2 == 0:
-                self.msg.traffic_light = predict_box[n].xyxy[0].to(torch.int16).flatten().tolist()
+                msg.traffic_light = predict_box[n].xyxy[0].to(torch.int16).flatten().tolist()
                 cnt_2 += 1          
 
             elif name == self.label_3.strip() and cnt_3 == 0:
-                self.msg.car = predict_box[n].xyxy[0].to(torch.int16).flatten().tolist()
+                msg.car = predict_box[n].xyxy[0].to(torch.int16).flatten().tolist()
                 cnt_3 += 1    
 
                 # Polygon 형식
@@ -166,7 +170,8 @@ class yolov8(Node):
                 # Box 형식
                 # self.msg_2.data = self.predicted[0].boxes[n].xyxy[0]       
 
-        self.publisher.publish(self.msg)      
+        self.publisher.publish(msg)      
+
 
     def shutdown(self):
         cv2.destroyAllWindows() # CV 창 닫기
@@ -174,7 +179,7 @@ class yolov8(Node):
 
 def main():
     rclpy.init()
-    yolov8_node = yolov8(NODE_NAME, TOPIC_NAME, SUB_TOPIC_NAME, PT_NAME, DEBUG, LABEL_NAME, DEVICE, THREAD)
+    yolov8_node = yolov8(NODE_NAME, TOPIC_NAME, SUB_TOPIC_NAME, PT_NAME, DEBUG, LABEL_NAME, DEVICE, THREAD, LOG)
     rclpy.spin(yolov8_node)
 
     yolov8_node.shutdown()
