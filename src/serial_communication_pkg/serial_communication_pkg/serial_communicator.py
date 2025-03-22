@@ -5,7 +5,7 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDur
 
 import serial
 import logging
-
+import time
 
 ## <Parameter> #####################################################################################
 
@@ -58,7 +58,6 @@ class serial_communicator(Node):
                 history=QoSHistoryPolicy.KEEP_LAST,
                 depth=1
                 )
-
         # 지령값 구독
         self.subscriber = self.create_subscription(UInt8MultiArray, sub_topic_name, self.send_callback, self.qos)
 
