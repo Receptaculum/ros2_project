@@ -50,17 +50,19 @@ class yolo_debugger(Node):
         lane_2 = np.array(msg.lane_2).reshape(-1, 2)
         traffic_light = np.array(msg.traffic_light).reshape(-1, 2)
         car = np.array(msg.car).reshape(-1, 2)
+        crosswalk = np.array(msg.crosswalk).reshape(-1, 2)
 
         os.system("clear")
         print(f"lane_1        | {lane_1.shape}")
         print(f"lane_2        | {lane_2.shape}")
         print(f"traffic_light | {traffic_light.shape}")
         print(f"car           | {car.shape}")
+        print(f"crosswalk     | {crosswalk.shape}")
 
 
         if self.debug == True:
             img_background = np.zeros([self.frame_size[1], self.frame_size[0]])
-            total_point = np.concatenate([lane_1, lane_2, traffic_light, car], 0)
+            total_point = np.concatenate([lane_1, lane_2, traffic_light, car, crosswalk], 0)
 
             for k in range(total_point.shape[0]):
                 img_background[int(total_point[k][1])][int(total_point[k][0])] = 1
@@ -76,6 +78,7 @@ def main():
 
     yolo_debugger_node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

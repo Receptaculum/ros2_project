@@ -22,17 +22,17 @@ NODE_NAME = "yolov8"
 # 발행 토픽 이름
 TOPIC_NAME = "segmented_data"
 
-# 라벨 이름 (lane_1, lane_2, traffic_light, car)
-LABEL_NAME = ["lane1", "lane2", "traffic_light", "car"]
+# 라벨 이름 (lane_1, lane_2, traffic_light, car, crosswalk)
+LABEL_NAME = ["lane1", "lane2", "traffic_light", "car", "cross_walk"]
 
 # 구독 토픽 이름
 SUB_TOPIC_NAME = "image_publisher"
 
 # PT 파일 이름 지정 (확장자 포함)
-PT_NAME = "lib/pt/best.pt"
+PT_NAME = "lib/pt/best.0323.2258.pt"
 
 # CV 처리 영상 출력 여부
-DEBUG = False
+DEBUG = True
 
 # 로깅 여부
 LOG = False
@@ -99,6 +99,7 @@ class yolov8(Node):
         self.label_1 = label_name[1]
         self.label_2 = label_name[2]
         self.label_3 = label_name[3]
+        self.label_4 = label_name[4]        
 
         # 디버그 변수 선언
         self.debug = debug
@@ -133,6 +134,7 @@ class yolov8(Node):
         cnt_1 = 0
         cnt_2 = 0
         cnt_3 = 0 
+        cnt_4 = 0
 
         # 확률에 대한 내림차순 정렬 (이미 Ultralytics의 전처리 과정에 해당 작업이 포함되어 있기에 제외함, Deprecated)
         # predict_box = self.predicted[0].boxes[torch.argsort(self.predicted[0].boxes.conf, descending=True)]
@@ -163,6 +165,10 @@ class yolov8(Node):
             elif name == self.label_3.strip() and cnt_3 == 0:
                 msg.car = predict_box[n].xyxy[0].to(torch.int16).flatten().tolist()
                 cnt_3 += 1    
+
+            elif name == self.label_4.strip() and cnt_4 == 0:
+                msg.crosswalk = predict_box[n].xyxy[0].to(torch.int16).flatten().tolist()
+                cnt_4 += 1   
 
                 # Polygon 형식
                 # self.msg_2.data = self.predicted[0].masks[n].xy[0].flatten().tolist() 
